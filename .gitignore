@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# SQLite 数据库
+backend/bill.db
+
+# 上传的图片
+backend/static/uploads/*.jpg
+backend/static/uploads/*.png
+backend/static/uploads/*.jpeg
+
+# 临时文件
+tmp_ocr.jpg
+*.tmp
+
+# 虚拟环境
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db

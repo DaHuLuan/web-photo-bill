@@ -1,0 +1,7 @@
+{
+  "name": "web-photo-bill-frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "python -m http.server 8080"
+  }
+}

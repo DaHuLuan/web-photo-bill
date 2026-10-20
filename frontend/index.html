@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网页拍照记账</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        * {box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui;}
+        .container {max-width: 900px; margin: 20px auto; padding: 16px;}
+        .card {border: 1px solid #ddd; padding: 16px; border-radius: 8px; margin-bottom: 16px;}
+        video {max-width: 100%; border: 1px solid #ccc;}
+        .preview-img {max-height: 200px; margin: 8px 0;}
+        input {width: 100%; padding: 8px; margin: 6px 0;}
+        button {padding: 8px 14px; margin: 4px; border: none; border-radius: 4px; cursor: pointer; background: #409eff; color: white;}
+        button:disabled {background: #aaa; cursor: not-allowed;}
+        .ocr-btn {background: #27ae60;}
+        table {width: 100%; border-collapse: collapse; margin-top: 16px;}
+        th, td {border: 1px solid #ddd; padding: 8px; text-align: center;}
+    </style>
+</head>
+<body>
+<div id="app" class="container">
+    <h2>📷 拍照记账（OCR自动识别票据金额）</h2>
+    <div class="card">
+        <video ref="videoRef" autoplay playsinline></video>
+        <button @click="openCamera">打开摄像头</button>
+        <button @click="capture">拍照</button>
+        <button class="ocr-btn" @click="ocrDetect" :disabled="!photoBase64">OCR识别金额</button>
+        <div v-if="photoBase64">
+            <p>预览：</p>
+            <img class="preview-img" :src="photoBase64"/>
+        </div>
+        <input v-model="form.name" placeholder="物品名称">
+        <input v-model="form.price" placeholder="价格" type="number" step="0.01">
+        <input v-model="form.remark" placeholder="备注">
+        <button @click="submitBill">保存账单</button>
+    </div>
+
+    <h3>账单列表</h3>
+    <table>
+        <tr><th>ID</th><th>名称</th><th>价格</th><th>备注</th><th>图片</th><th>时间</th></tr>
+        <tr v-for="item in billList" :key="item.id">
+            <td>{{item.id}}</td>
+            <td>{{item.name}}</td>
+            <td>{{item.price}}</td>
+            <td>{{item.remark}}</td>
+            <td><img :src="item.img_path" style="height:80px;"></td>
+            <td>{{item.create_time}}</td>
+        </tr>
+    </table>
+</div>
+
+<script>
+const { createApp } = Vue
+createApp({
+    data() {
+        return {
+            videoRef: null,
+            stream: null,
+            photoBase64: "",
+            form: { name: "", price: "", remark: "" },
+            billList: []
+        }
+    },
+    mounted() {
+        this.videoRef = this.$refs.videoRef
+        this.fetchBills()
+    },
+    methods: {
+        async openCamera() {
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia({ video: true })
+                this.videoRef.srcObject = this.stream
+            } catch (e) {
+                alert("摄像头打开失败，请授予浏览器摄像头权限")
+            }
+        },
+        capture() {
+            if (!this.stream) return alert("请先打开摄像头")
+            const canvas = document.createElement("canvas")
+            canvas.width = this.videoRef.videoWidth
+            canvas.height = this.videoRef.videoHeight
+            const ctx = canvas.getContext("2d")
+            ctx.drawImage(this.videoRef, 0, 0)
+            this.photoBase64 = canvas.toDataURL("image/jpeg")
+        },
+        async ocrDetect() {
+            const res = await fetch("http://127.0.0.1:5000/api/ocr_price", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ img: this.photoBase64 })
+            })
+            const data = await res.json()
+            if (data.code === 200) {
+                this.form.price = data.price
+                alert("识别成功，已自动填充价格！")
+            } else {
+                alert(data.msg)
+            }
+        },
+        async submitBill() {
+            if (!this.photoBase64) return alert("请拍照")
+            if (!this.form.name) return alert("填写物品名称")
+            const res = await fetch("http://127.0.0.1:5000/api/add_bill", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: this.form.name,
+                    price: this.form.price,
+                    remark: this.form.remark,
+                    img: this.photoBase64
+                })
+            })
+            const data = await res.json()
+            alert(data.msg)
+            this.fetchBills()
+            this.photoBase64 = ""
+            this.form = { name: "", price: "", remark: "" }
+        },
+        async fetchBills() {
+            const res = await fetch("http://127.0.0.1:5000/api/bills")
+            const json = await res.json()
+            this.billList = json.data
+        }
+    }
+}).mount("#app")
+</script>
+</body>
+</html>
